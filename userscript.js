@@ -105,7 +105,7 @@
         }
     }
 
-    // 4. Analyser la réponse et la normaliser
+    // 4. Analyser la réponse et la normaliser avec sa cote
     function extractAvailability(apiResponse) {
         const availableBranches = [];
         
@@ -116,60 +116,67 @@
             const isAvailable = holding.IsAvailable === true || (holding.Statut && holding.Statut.toLowerCase().includes('rayon'));
             
             if (isAvailable && holding.Site) {
-                // Le nom de la bibliothèque se trouve dans holding.Site
-                availableBranches.push(holding.Site.trim());
+                availableBranches.push({
+                    biblio: holding.Site.trim(),
+                    cote: holding.Cote ? holding.Cote.trim() : "Cote inconnue"
+                });
             }
         });
         
         // On dé-duplique au cas où un livre soit présent plusieurs fois dans la même bibliothèque
-        return [...new Set(availableBranches)];
+        const uniqueBranches = [];
+        const seen = new Set();
+        for (const branch of availableBranches) {
+            if (!seen.has(branch.biblio)) {
+                seen.add(branch.biblio);
+                uniqueBranches.push(branch);
+            }
+        }
+        return uniqueBranches;
     }
 
     // 5. Algorithme Glouton (Greedy)
     function calculateOptimizedRoute(itemsMap) {
-        // itemsMap: { "Titre livre": ["Biblio A", "Biblio B"], ... }
-        
-        // Liste de tous les livres à trouver
         let remainingBooks = new Set(Object.keys(itemsMap));
         
-        // Mapping Inversé: Biblio -> Set([livres disponibles])
+        // Mapping Inversé: Biblio -> { Titre: Cote }
         const biblioToBooks = {};
-        for (const [book, biblios] of Object.entries(itemsMap)) {
-            for (const biblio of biblios) {
-                if (!biblioToBooks[biblio]) {
-                    biblioToBooks[biblio] = new Set();
+        for (const [book, branches] of Object.entries(itemsMap)) {
+            for (const branch of branches) {
+                if (!biblioToBooks[branch.biblio]) {
+                    biblioToBooks[branch.biblio] = {};
                 }
-                biblioToBooks[biblio].add(book);
+                biblioToBooks[branch.biblio][book] = branch.cote;
             }
         }
 
-        const route = []; // Liste des étapes : { biblio: ..., books: [...] }
+        const route = [];
 
         while (remainingBooks.size > 0) {
             let bestBiblio = null;
-            let bestCoverage = new Set();
+            let bestCoverage = [];
 
-            for (const [biblio, availabilitySet] of Object.entries(biblioToBooks)) {
-                // Combient de livres manquants cette bibliothèque couvre-t-elle ?
-                const coverage = new Set([...availabilitySet].filter(x => remainingBooks.has(x)));
+            for (const [biblio, booksObj] of Object.entries(biblioToBooks)) {
+                const coverage = Object.keys(booksObj).filter(x => remainingBooks.has(x));
                 
-                if (coverage.size > bestCoverage.size) {
+                if (coverage.length > bestCoverage.length) {
                     bestCoverage = coverage;
                     bestBiblio = biblio;
                 }
             }
 
-            // Si aucune bibliothèque ne peut fournir les livres restants
-            if (bestCoverage.size === 0) {
-                const missing = Array.from(remainingBooks);
+            if (bestCoverage.length === 0) {
+                const missing = Array.from(remainingBooks).map(title => ({ title, cote: "N/A" }));
                 route.push({ biblio: "INDISPONIBLE / INTROUVABLE", books: missing });
                 break;
             }
 
-            // On ajoute cette étape au trajet
-            route.push({ biblio: bestBiblio, books: Array.from(bestCoverage) });
+            const booksWithCotes = bestCoverage.map(title => ({
+                title: title,
+                cote: biblioToBooks[bestBiblio][title]
+            }));
 
-            // On retire ces livres des livres restants
+            route.push({ biblio: bestBiblio, books: booksWithCotes });
             bestCoverage.forEach(book => remainingBooks.delete(book));
         }
 
@@ -179,18 +186,25 @@
     // 6. Afficher l'interface de résultat
     function showReport(route) {
         const modal = document.createElement('div');
-        modal.style.cssText = 'position: fixed; top: 10%; left: 10%; width: 80%; height: 80%; background: white; border: 2px solid #ccc; z-index: 10000; padding: 20px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 10px; color: black;';
+        modal.style.cssText = 'position: fixed; top: 5%; left: 5%; width: 90%; max-width: 800px; height: 90%; max-height: 90vh; background: #f9f9f9; border: 1px solid #ddd; z-index: 10000; padding: 30px; overflow-y: auto; box-shadow: 0 15px 40px rgba(0,0,0,0.6); border-radius: 12px; color: #333; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;';
         
-        let html = '<h2>Optimisation du Ramassage</h2><ul>';
+        let html = '<h2 style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">🏁 Votre parcours de ramassage optimisé</h2><ul style="list-style-type: none; padding: 0;">';
         
         route.forEach(step => {
-            html += `<li style="margin-bottom: 20px;">
-                <strong>${step.biblio} (${step.books.length} document${step.books.length > 1 ? 's' : ''}) :</strong>
-                <ul>${step.books.map(b => `<li>${b}</li>`).join('')}</ul>
+            html += `<li style="margin-bottom: 25px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                <h3 style="margin-top: 0; margin-bottom: 15px; color: #3498db; font-size: 1.3em;">
+                    🏛️ ${step.biblio} <span style="background: #e1f0fa; color: #2980b9; font-size: 0.75em; padding: 3px 8px; border-radius: 12px; margin-left: 10px;">${step.books.length} document${step.books.length > 1 ? 's' : ''}</span>
+                </h3>
+                <ul style="margin: 0; padding-left: 15px; list-style-type: square; color: #555;">
+                    ${step.books.map(b => `<li style="margin-bottom: 12px; line-height: 1.4;">
+                        <strong style="color: #2c3e50; font-size: 1.1em;">${b.title}</strong><br>
+                        <span style="display: inline-block; margin-top: 4px; color: #7f8c8d; font-size: 0.9em; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; border: 1px solid #eaeaea; font-family: monospace;">📍 Cote : <b>${b.cote}</b></span>
+                    </li>`).join('')}
+                </ul>
             </li>`;
         });
         
-        html += '</ul><button id="closeModalBtn" style="padding: 10px; background: red; color: white; border: none; border-radius: 5px; cursor: pointer;">Fermer</button>';
+        html += '</ul><div style="text-align: center; margin-top: 30px;"><button id="closeModalBtn" style="padding: 12px 30px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);">Fermer le rapport</button></div>';
         modal.innerHTML = html;
         
         document.body.appendChild(modal);
@@ -211,7 +225,7 @@
             return;
         }
 
-        const itemsMap = {}; // "Titre": ["Biblio 1", "Biblio 2"]
+        const itemsMap = {}; 
         let count = 0;
         
         for (const item of items) {
@@ -219,11 +233,18 @@
             this.innerText = `Recherche (${count}/${items.length})...`;
 
             const apiRes = await fetchHoldings(item.rscId, item.docbase);
+            
+            // On extrait le vrai titre propre depuis l'API pour écraser "Livre (XXX)"
+            let realTitle = item.title;
+            if (apiRes?.d?.fieldList?.Title?.[0]) {
+                realTitle = apiRes.d.fieldList.Title[0];
+            }
+
             const availableBranches = extractAvailability(apiRes);
             if (availableBranches.length > 0) {
-                itemsMap[item.title] = availableBranches;
+                itemsMap[realTitle] = availableBranches;
             } else {
-                itemsMap[item.title] = []; // Indisponible
+                itemsMap[realTitle] = []; // Indisponible
             }
 
             // [ANTI RATE-LIMIT]

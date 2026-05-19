@@ -4,7 +4,7 @@
 // @version      1.0
 // @description  Récupère les disponibilités du panier et optimise le parcours de ramassage (Algo Glouton).
 // @author       Vous
-// @match        https://bibliotheques.paris.fr/*
+// @match        https://bibliotheques.paris.fr/Default/account.aspx#/basket
 // @grant        none
 // ==/UserScript==
 

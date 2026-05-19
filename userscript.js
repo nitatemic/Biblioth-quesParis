@@ -4,7 +4,7 @@
 // @version      1.0
 // @description  Récupère les disponibilités du panier et optimise le parcours de ramassage (Algo Glouton).
 // @author       Vous
-// @match        https://bibliotheques.paris.fr/\*
+// @match        https://bibliotheques.paris.fr/*
 // @grant        none
 // ==/UserScript==
 
@@ -185,30 +185,155 @@
 
     // 6. Afficher l'interface de résultat
     function showReport(route) {
+        const libraryAddresses = {
+            "Georges Brassens": "38, rue Gassendi",
+            "Aimé Césaire": "5, rue de Ridder",
+            "Benoîte Groult": "25, rue du commandant René Mouchotte",
+            "Andrée Chedid": "36-40, rue Emeriau",
+            "Gutenberg": "8, rue de la Montagne d’Aulas",
+            "Vaugirard": "154, rue Lecourbe",
+            "Marguerite Yourcenar": "41, rue d’Alleray",
+            "Maison de Balzac": "47, rue Raynouard",
+            "Germaine Tillion": "6, rue du Commandant Schloesing",
+            "Tourisme et des voyages": "6, rue du Commandant Schloesing",
+            "Musset": "20, rue de Musset",
+            "Batignolles": "Mairie, 18 rue des Batignolles",
+            "Colette Vivier": "6, rue Fourneyron",
+            "Edmond Rostand": "11, rue Nicolas Chuquet",
+            "Robert Sabatier": "29, rue Hermel",
+            "Goutte d’Or": "2-4, rue Fleury",
+            "Maurice Genevoix": "19, rue Tristan Tzara",
+            "Jacqueline de Romilly": "16, avenue de la Porte-Montmartre",
+            "Václav Havel": "26, esplanade Nathalie Sarraute",
+            "Benjamin Rabier": "141, avenue de Flandre",
+            "Claude Lévi-Strauss": "41, avenue de Flandre",
+            "Astrid Lindgren": "42-44, rue Petit",
+            "Archives de Paris": "18, boulevard Sérurier",
+            "Jacqueline Dreyfus-Weill": "6, rue Fessart",
+            "Hergé": "2-4, rue du Département",
+            "James Baldwin": "10 bis, rue Henri Ribière",
+            "Naguib Mahfouz": "66, rue des Couronnes",
+            "Mortier": "113, boulevard Mortier",
+            "Louise Michel": "29/35, rue des Haies",
+            "Oscar Wilde": "12, rue du Télégraphe",
+            "Maryse Condé": "17, rue Sorbier",
+            "Marguerite Duras": "115, rue de Bagnolet",
+            "Assia Djebar": "1, rue Reynaldo Hahn",
+            "François Truffaut": "Forum des Halles, niveau -3, 4, rue du Cinéma",
+            "Canopée": "10, passage de la Canopée",
+            "Charlotte Delbo": "2, passage des Petits Pères",
+            "Marguerite Audoux": "10, rue Portefoin",
+            "Arthur Rimbaud": "2, place Baudoyer",
+            "Hôtel de Ville": "Hôtel de Ville, 29 rue de Rivoli",
+            "Forney": "Hôtel de Sens, 1, rue du Figuier",
+            "Historique": "Hôtel Lamoignon, 24, rue Pavée",
+            "Buffon": "15 bis, rue Buffon",
+            "Littératures Policières": "48-50, rue du Cardinal Lemoine",
+            "L’Heure Joyeuse": "6-12, rue des Prêtres-Saint-Séverin",
+            "Mohammed Arkoun": "74-76, rue Mouffetard",
+            "Rainer Maria Rilke": "88 ter, boulevard de Port-Royal",
+            "André Malraux": "112, rue de Rennes",
+            "Amélie": "164, rue de Grenelle",
+            "Saint-Simon": "116 rue de Grenelle",
+            "Agustina Bessa-Luís": "17 ter, avenue Beaucour",
+            "Jean d’Ormesson": "Mairie, 3 rue de Lisbonne",
+            "Louise Walser-Gaillard": "26, rue Chaptal",
+            "Drouot": "11, rue Drouot",
+            "Valeyre": "24, rue Marguerite de Rochechouart",
+            "François Villon": "81, boulevard de la Villette",
+            "Françoise Sagan": "8, rue Léon Schwartzenberg",
+            "Heure Joyeuse": "8, rue Léon Schwartzenberg",
+            "Claire Bretécher": "11, rue de Lancry",
+            "Violette Leduc": "18, rue Faidherbe",
+            "Toni Morrison": "20 bis, avenue Parmentier",
+            "Diderot": "42, avenue Daumesnil",
+            "Maison du Jardinage": "41, rue Paul Belmondo",
+            "École Du Breuil": "Route de la ferme, Bois de Vincennes",
+            "Hélène Berr": "70, rue de Picpus",
+            "Paris nature": "Parc Floral",
+            "Saint-Éloi": "23, rue du Colonel Rozanoff",
+            "École Estienne": "18, boulevard Auguste-Blanqui",
+            "Glacière": "132, rue de la Glacière",
+            "Marina Tsvetaïeva": "132, rue de la Glacière",
+            "Italie": "211-213, boulevard Vincent Auriol",
+            "Jean-Pierre Melville": "79, rue Nationale",
+            "Marguerite Durand": "79, rue Nationale",
+            "Virginia Woolf": "4, rue Germ Krull",
+            "Musicale": "Forum des Halles, -8, Porte Saint-Eustache"
+        };
+        
+        function getAddress(biblioName) {
+            const nameUpper = biblioName.toUpperCase();
+            for (const [key, addr] of Object.entries(libraryAddresses)) {
+                if (nameUpper.includes(key.toUpperCase())) {
+                    return addr;
+                }
+            }
+            return "";
+        }
+
         const modal = document.createElement('div');
         modal.style.cssText = 'position: fixed; top: 5%; left: 5%; width: 90%; max-width: 800px; height: 90%; max-height: 90vh; background: #f9f9f9; border: 1px solid #ddd; z-index: 10000; padding: 30px; overflow-y: auto; box-shadow: 0 15px 40px rgba(0,0,0,0.6); border-radius: 12px; color: #333; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;';
         
         let html = '<h2 style="margin-top: 0; color: #2c3e50; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px;">🏁 Votre parcours de ramassage optimisé</h2><ul style="list-style-type: none; padding: 0;">';
         
-        route.forEach(step => {
-            html += `<li style="margin-bottom: 25px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-                <h3 style="margin-top: 0; margin-bottom: 15px; color: #3498db; font-size: 1.3em;">
-                    🏛️ ${step.biblio} <span style="background: #e1f0fa; color: #2980b9; font-size: 0.75em; padding: 3px 8px; border-radius: 12px; margin-left: 10px;">${step.books.length} document${step.books.length > 1 ? 's' : ''}</span>
+        let clipboardText = "Parcours de ramassage :\n\n";
+
+        route.forEach((step, index) => {
+            const address = getAddress(step.biblio);
+            const addressHtml = address ? `<div style="font-size: 0.85em; color: #666; margin-top: 3px; font-weight: normal;">📍 ${address}</div>` : '';
+            const copyAddressText = address ? ` — ${address}` : '';
+
+            // Alternance subtile des couleurs de fond
+            const bgColor = index % 2 === 0 ? 'white' : '#f0f4f8';
+
+            html += `<li style="margin-bottom: 15px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 10px; background: ${bgColor}; box-shadow: 0 2px 5px rgba(0,0,0,0.04);">
+                <h3 style="margin-top: 0; margin-bottom: 10px; color: #2980b9; font-size: 1.2em;">
+                    🏛️ ${step.biblio} <span style="background: #e1f0fa; color: #2980b9; font-size: 0.75em; padding: 3px 8px; border-radius: 12px; margin-left: 5px;">${step.books.length} doc.</span>
+                    ${addressHtml}
                 </h3>
-                <ul style="margin: 0; padding-left: 15px; list-style-type: square; color: #555;">
-                    ${step.books.map(b => `<li style="margin-bottom: 12px; line-height: 1.4;">
-                        <strong style="color: #2c3e50; font-size: 1.1em;">${b.title}</strong><br>
-                        <span style="display: inline-block; margin-top: 4px; color: #7f8c8d; font-size: 0.9em; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; border: 1px solid #eaeaea; font-family: monospace;">📍 Cote : <b>${b.cote}</b></span>
+                <ul style="margin: 0; padding-left: 20px; list-style-type: disc; color: #444;">
+                    ${step.books.map(b => `<li style="margin-bottom: 6px; line-height: 1.3;">
+                        <strong style="color: #2c3e50;">${b.title}</strong> 
+                        <span style="color: #7f8c8d; font-size: 0.9em; background: #fff; padding: 2px 6px; border-radius: 4px; border: 1px solid #eaeaea; font-family: monospace; margin-left: 8px;">📍 ${b.cote}</span>
                     </li>`).join('')}
                 </ul>
             </li>`;
+
+            // Ajout au texte pour le presse-papier
+            clipboardText += `🏛️ ${step.biblio}${copyAddressText}\n`;
+            step.books.forEach(b => {
+                clipboardText += `  - ${b.title} (📍 ${b.cote})\n`;
+            });
+            clipboardText += `\n`;
         });
         
-        html += '</ul><div style="text-align: center; margin-top: 30px;"><button id="closeModalBtn" style="padding: 12px 30px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);">Fermer le rapport</button></div>';
+        html += `</ul>
+        <div style="text-align: center; margin-top: 30px; display: flex; justify-content: center; gap: 15px;">
+            <button id="copyToClipboardBtn" style="padding: 12px 20px; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; box-shadow: 0 4px 6px rgba(39, 174, 96, 0.3);">📋 Copier le résumé</button>
+            <button id="closeModalBtn" style="padding: 12px 20px; background: #e74c3c; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 600; box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);">❌ Fermer</button>
+        </div>`;
         modal.innerHTML = html;
         
         document.body.appendChild(modal);
+        
         document.getElementById('closeModalBtn').addEventListener('click', () => modal.remove());
+        
+        // Logique de copie dans le presse-papier
+        document.getElementById('copyToClipboardBtn').addEventListener('click', (e) => {
+            navigator.clipboard.writeText(clipboardText).then(() => {
+                const originalText = e.target.innerText;
+                e.target.innerText = "✅ Copié !";
+                e.target.style.background = "#2ecc71";
+                setTimeout(() => {
+                    e.target.innerText = originalText;
+                    e.target.style.background = "#27ae60";
+                }, 2000);
+            }).catch(err => {
+                console.error("Erreur copie", err);
+                alert("Impossible de copier automatiquement. Autorisez le presse-papier.");
+            });
+        });
     }
 
     // Workflow Principal
@@ -234,10 +359,15 @@
 
             const apiRes = await fetchHoldings(item.rscId, item.docbase);
             
-            // On extrait le vrai titre propre depuis l'API pour écraser "Livre (XXX)"
+            // On extrait le vrai titre propre et l'auteur depuis l'API pour écraser "Livre (XXX)"
             let realTitle = item.title;
             if (apiRes?.d?.fieldList?.Title?.[0]) {
                 realTitle = apiRes.d.fieldList.Title[0];
+                // L'auteur se trouve souvent dans Author ou Author_sort
+                const author = apiRes.d.fieldList.Author?.[0] || apiRes.d.fieldList.Author_sort?.[0];
+                if (author) {
+                    realTitle += ` (de ${author})`;
+                }
             }
 
             const availableBranches = extractAvailability(apiRes);
